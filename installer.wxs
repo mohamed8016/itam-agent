@@ -4,7 +4,7 @@
     Id="*"
     Name="IT Asset Inventory Agent"
     Language="1033"
-    Version="1.0.1"
+    Version="1.0.2"
     Manufacturer="ITAM"
     UpgradeCode="{5B832979-3F9E-48BC-B1D0-2257AFCB8842}">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x86" />

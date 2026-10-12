@@ -632,7 +632,16 @@ def main():
     
     root = tk.Tk()
     root.withdraw()
-    icon.run_detached()
+
+    def show_tray_icon(icon):
+        try:
+            icon.visible = True
+            logger.info("System tray icon is visible.")
+        except Exception:
+            logger.exception("Could not display the system tray icon.")
+
+    logger.info("Starting the system tray icon.")
+    icon.run_detached(setup=show_tray_icon)
     threading.Thread(
         target=send_inventory,
         name="initial-inventory-sync",
