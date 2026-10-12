@@ -55,7 +55,8 @@
       <Component Id="ProgramDataPermissions" Guid="{B4A5D5F7-EE72-4DB8-88DB-AD8418CC86A5}">
         <CreateFolder>
           <Permission
-            User="S-1-5-32-545"
+            User="Users"
+            Domain="BUILTIN"
             GenericRead="yes"
             GenericWrite="yes"
             Delete="yes" />
