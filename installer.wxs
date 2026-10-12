@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="IT Asset Inventory Agent"
+    Language="1033"
+    Version="1.0.1"
+    Manufacturer="ITAM"
+    UpgradeCode="{5B832979-3F9E-48BC-B1D0-2257AFCB8842}">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x86" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="IT Asset Inventory Agent" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+
+    <UIRef Id="WixUI_ProgressOnly" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="ITAM Agent" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ProgramMenuDir" Name="ITAM Agent" />
+      </Directory>
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="ProgramDataDir" Name="ITAM Agent" />
+      </Directory>
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AgentExecutable" Guid="{D81CE3AD-6764-4F8D-83A4-1AAE0741CD7D}">
+        <File Id="AgentExe" Source="dist\ITAMAgent.exe" KeyPath="yes">
+          <Shortcut
+            Id="AgentShortcut"
+            Directory="ProgramMenuDir"
+            Name="ITAM Agent"
+            WorkingDirectory="INSTALLFOLDER"
+            Advertise="no" />
+        </File>
+        <RemoveFolder Id="ProgramMenuDir" Directory="ProgramMenuDir" On="uninstall" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ProgramDataDir">
+      <Component Id="ProgramDataPermissions" Guid="{B4A5D5F7-EE72-4DB8-88DB-AD8418CC86A5}">
+        <CreateFolder KeyPath="yes">
+          <Permission
+            User="S-1-5-32-545"
+            GenericRead="yes"
+            GenericWrite="yes"
+            Delete="yes" />
+        </CreateFolder>
+      </Component>
+      <Component Id="EncryptedConfiguration" Guid="{D19DB5D0-4ECC-4B8E-8A11-897840A11B3D}">
+        <File
+          Id="ConfigFile"
+          Source="config.enc"
+          KeyPath="yes"
+          NeverOverwrite="yes"
+          Permanent="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="StartupRegistry" Guid="{FCEAF30A-1C7D-4E1E-AE05-E3EB1DC4DC4D}">
+        <RegistryKey Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Run">
+          <RegistryValue
+            Name="ITAMAgent"
+            Type="string"
+            Value="&quot;[INSTALLFOLDER]ITAMAgent.exe&quot;"
+            KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+    <ComponentGroup Id="ProductComponents">
+      <ComponentRef Id="AgentExecutable" />
+      <ComponentRef Id="ProgramDataPermissions" />
+      <ComponentRef Id="EncryptedConfiguration" />
+      <ComponentRef Id="StartupRegistry" />
+    </ComponentGroup>
+  </Product>
+</Wix>

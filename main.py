@@ -14,6 +14,8 @@ import requests
 import hashlib
 import subprocess
 import tempfile
+import threading
+from queue import Empty, Queue
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog
@@ -23,6 +25,9 @@ from PIL import Image, ImageDraw
 
 logger = logging.getLogger("itam_agent")
 _instance_mutex = None
+_DEFAULT_ADMIN_PASSWORD_HASH = "e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7"
+_LEGACY_ADMIN_PASSWORD_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
+_tray_commands = Queue()
 
 
 def acquire_single_instance():
@@ -119,12 +124,18 @@ def load_config():
         cipher = Fernet(key)
         with get_config_path().open("rb") as f:
             decrypted = cipher.decrypt(f.read())
-        return json.loads(decrypted.decode('utf-8'))
+        config = json.loads(decrypted.decode('utf-8'))
+        if config.get("admin_password_hash") == _LEGACY_ADMIN_PASSWORD_HASH:
+            config["admin_password_hash"] = _DEFAULT_ADMIN_PASSWORD_HASH
+            if not save_config(config):
+                logger.error("Could not persist the migrated admin password hash.")
+        return config
     except Exception as e:
         logger.exception("Could not load encrypted configuration: %s", e)
         return None
 
 def save_config(config_data):
+    temporary_path = None
     try:
         key = get_secret_key()
         cipher = Fernet(key)
@@ -132,12 +143,30 @@ def save_config(config_data):
         encrypted = cipher.encrypt(json_bytes)
         config_path = get_config_path()
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        with config_path.open("wb") as f:
-            f.write(encrypted)
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=config_path.parent,
+            prefix=f".{config_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as config_file:
+            temporary_path = Path(config_file.name)
+            config_file.write(encrypted)
+            config_file.flush()
+            os.fsync(config_file.fileno())
+        os.replace(temporary_path, config_path)
         return True
     except Exception as e:
         logger.exception("Could not save encrypted configuration: %s", e)
         return False
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logger.exception("Could not remove temporary configuration file.")
 
 # ----------------------------------------------------
 # 2. جمع بيانات الجهاز وإرسالها
@@ -492,24 +521,24 @@ def send_inventory():
 # 3. واجهة الإعدادات المحمية بكلمة سر
 # ----------------------------------------------------
 
-def open_settings():
+def open_settings(parent):
     config = load_config()
     if not config:
         return
 
-    root = tk.Tk()
-    root.title("ITAM Agent Settings")
-    root.geometry("320x240")
-    root.resizable(False, False)
+    settings_window = tk.Toplevel(parent)
+    settings_window.title("ITAM Agent Settings")
+    settings_window.geometry("320x240")
+    settings_window.resizable(False, False)
 
-    tk.Label(root, text="Server IP:").pack(pady=(10, 2))
-    ip_entry = tk.Entry(root, width=25, justify="center")
+    tk.Label(settings_window, text="Server IP:").pack(pady=(10, 2))
+    ip_entry = tk.Entry(settings_window, width=25, justify="center")
     ip_entry.insert(0, config.get("server_ip", ""))
     ip_entry.config(state="disabled")
     ip_entry.pack()
 
-    tk.Label(root, text="Server Port:").pack(pady=(10, 2))
-    port_entry = tk.Entry(root, width=25, justify="center")
+    tk.Label(settings_window, text="Server Port:").pack(pady=(10, 2))
+    port_entry = tk.Entry(settings_window, width=25, justify="center")
     port_entry.insert(0, config.get("server_port", ""))
     port_entry.config(state="disabled")
     port_entry.pack()
@@ -517,7 +546,12 @@ def open_settings():
     is_unlocked = [False]
 
     def unlock():
-        password = simpledialog.askstring("Admin Required", "Enter Admin Password:", show='*')
+        password = simpledialog.askstring(
+            "Admin Required",
+            "Enter Admin Password:",
+            show="*",
+            parent=settings_window,
+        )
         if password:
             hashed = hashlib.sha256(password.encode('utf-8')).hexdigest()
             if hashed == config.get("admin_password_hash"):
@@ -527,23 +561,29 @@ def open_settings():
                 unlock_btn.config(state="disabled", text="Unlocked")
                 save_btn.config(state="normal")
             else:
-                messagebox.showerror("Error", "Incorrect Password!")
+                messagebox.showerror(
+                    "Error",
+                    "Incorrect Password!",
+                    parent=settings_window,
+                )
 
     def save():
         if is_unlocked[0]:
             config["server_ip"] = ip_entry.get().strip()
             config["server_port"] = port_entry.get().strip()
             if save_config(config):
-                messagebox.showinfo("Success", "Settings saved!")
-                root.destroy()
+                messagebox.showinfo(
+                    "Success",
+                    "Settings saved!",
+                    parent=settings_window,
+                )
+                settings_window.destroy()
 
-    unlock_btn = tk.Button(root, text="🔒 Unlock for Admin", command=unlock)
+    unlock_btn = tk.Button(settings_window, text="🔒 Unlock for Admin", command=unlock)
     unlock_btn.pack(pady=10)
 
-    save_btn = tk.Button(root, text="Save Changes", command=save, state="disabled")
+    save_btn = tk.Button(settings_window, text="Save Changes", command=save, state="disabled")
     save_btn.pack(pady=5)
-
-    root.mainloop()
 
 # ----------------------------------------------------
 # 4. أيقونة شريط المهام (System Tray)
@@ -576,10 +616,11 @@ def main():
             logger.exception("Could not display the sync notification.")
 
     def on_settings(icon, item):
-        open_settings()
+        _tray_commands.put("settings")
 
     def on_exit(icon, item):
         icon.stop()
+        _tray_commands.put("exit")
 
     menu = pystray.Menu(
         pystray.MenuItem("Sync Now", on_sync),
@@ -589,10 +630,34 @@ def main():
 
     icon = pystray.Icon("ITAM_Agent", create_tray_icon(), "ITAM Agent", menu)
     
-    # إرسال البيانات المبدئية عند التشغيل
-    send_inventory()
-    
-    icon.run()
+    root = tk.Tk()
+    root.withdraw()
+    icon.run_detached()
+    threading.Thread(
+        target=send_inventory,
+        name="initial-inventory-sync",
+        daemon=True,
+    ).start()
+
+    def process_tray_commands():
+        try:
+            while True:
+                command = _tray_commands.get_nowait()
+                if command == "settings":
+                    open_settings(root)
+                elif command == "exit":
+                    root.quit()
+                    return
+        except Empty:
+            pass
+        root.after(100, process_tray_commands)
+
+    root.after(100, process_tray_commands)
+    try:
+        root.mainloop()
+    finally:
+        icon.stop()
+        root.destroy()
 
 if __name__ == "__main__":
     main()

@@ -5,6 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -29,25 +30,33 @@ jobs:
         pip install -r requirements.txt
         python -m compileall -q main.py
 
-    # 4. بناء ملف .exe وتضمين مفتاح secret.key بداخله
+    # 4. بناء ملف .exe بدون نافذة console وتضمين مفتاح التشفير
     - name: Build Executable with PyInstaller
       run: |
         pyinstaller --noconsole --onefile --name ITAMAgent --add-data "secret.key;." main.py
 
-    # 5. تثبيت Inno Setup عبر Chocolatey وإضافته للمسار (طريقة رسمية وآمنة 🎯)
-    - name: Install Inno Setup via Chocolatey
+    # 5. تثبيت WiX Toolset
+    - name: Install WiX Toolset
       run: |
-        choco install innosetup -y
-        echo "C:\Program Files (x86)\Inno Setup 6" >> $env:GITHUB_PATH
+        choco install wixtoolset -y --no-progress
+        $wixBin = Get-ChildItem "${env:ProgramFiles(x86)}\WiX Toolset v3.*\bin" -Directory |
+          Sort-Object Name -Descending |
+          Select-Object -First 1
+        if (-not $wixBin) { throw "WiX Toolset v3 was not found after installation." }
+        echo "$($wixBin.FullName)" >> $env:GITHUB_PATH
 
-    # 6. تجميع ملف installer.iss باستخدام ISCC مباشرة
-    - name: Compile Inno Setup Script
+    # 6. بناء حزمة MSI
+    - name: Build MSI
       run: |
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+        New-Item -ItemType Directory -Force -Path Output | Out-Null
+        candle.exe -nologo -ext WixUIExtension installer.wxs
+        light.exe -nologo -ext WixUIExtension -out Output\ITAM_Agent.msi installer.wixobj
+        if (-not (Test-Path Output\ITAM_Agent.msi)) { throw "MSI build did not produce Output\ITAM_Agent.msi." }
 
     # 7. رفع الملف النهائي للتنزيل
     - name: Upload Installer Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ITAM-Agent-Installer
-        path: Output/*.exe
+        path: Output/ITAM_Agent.msi
+        if-no-files-found: error
