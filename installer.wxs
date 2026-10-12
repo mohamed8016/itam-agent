@@ -29,15 +29,25 @@
 
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="AgentExecutable" Guid="{D81CE3AD-6764-4F8D-83A4-1AAE0741CD7D}">
-        <File Id="AgentExe" Source="dist\ITAMAgent.exe" KeyPath="yes">
-          <Shortcut
-            Id="AgentShortcut"
-            Directory="ProgramMenuDir"
-            Name="ITAM Agent"
-            WorkingDirectory="INSTALLFOLDER"
-            Advertise="no" />
-        </File>
-        <RemoveFolder Id="ProgramMenuDir" Directory="ProgramMenuDir" On="uninstall" />
+        <File Id="AgentExe" Source="dist\ITAMAgent.exe" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ProgramMenuDir">
+      <Component Id="AgentShortcutComponent" Guid="{3A8C2D51-74F6-4D23-9B10-6E5A1C8F42D7}">
+        <Shortcut
+          Id="AgentShortcut"
+          Name="ITAM Agent"
+          Target="[INSTALLFOLDER]ITAMAgent.exe"
+          WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\ITAM Agent"
+          Name="ShortcutInstalled"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
       </Component>
     </DirectoryRef>
 
@@ -84,6 +94,7 @@
 
     <ComponentGroup Id="ProductComponents">
       <ComponentRef Id="AgentExecutable" />
+      <ComponentRef Id="AgentShortcutComponent" />
       <ComponentRef Id="ProgramDataPermissions" />
       <ComponentRef Id="EncryptedConfiguration" />
       <ComponentRef Id="StartupRegistry" />
