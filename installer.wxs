@@ -45,21 +45,30 @@
 
     <DirectoryRef Id="ProgramDataDir">
       <Component Id="ProgramDataPermissions" Guid="{B4A5D5F7-EE72-4DB8-88DB-AD8418CC86A5}">
-        <CreateFolder KeyPath="yes">
+        <CreateFolder>
           <Permission
             User="S-1-5-32-545"
             GenericRead="yes"
             GenericWrite="yes"
             Delete="yes" />
         </CreateFolder>
+        <RegistryKey Root="HKLM" Key="Software\ITAM Agent">
+          <RegistryValue
+            Name="ProgramDataPermissions"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+        </RegistryKey>
       </Component>
-      <Component Id="EncryptedConfiguration" Guid="{D19DB5D0-4ECC-4B8E-8A11-897840A11B3D}">
+      <Component
+        Id="EncryptedConfiguration"
+        Guid="{D19DB5D0-4ECC-4B8E-8A11-897840A11B3D}"
+        NeverOverwrite="yes"
+        Permanent="yes">
         <File
           Id="ConfigFile"
           Source="config.enc"
-          KeyPath="yes"
-          NeverOverwrite="yes"
-          Permanent="yes" />
+          KeyPath="yes" />
       </Component>
     </DirectoryRef>
 

@@ -50,7 +50,9 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force -Path Output | Out-Null
         candle.exe -nologo -ext WixUIExtension installer.wxs
+        if ($LASTEXITCODE -ne 0) { throw "WiX compilation failed with exit code $LASTEXITCODE." }
         light.exe -nologo -ext WixUIExtension -out Output\ITAM_Agent.msi installer.wixobj
+        if ($LASTEXITCODE -ne 0) { throw "WiX linking failed with exit code $LASTEXITCODE." }
         if (-not (Test-Path Output\ITAM_Agent.msi)) { throw "MSI build did not produce Output\ITAM_Agent.msi." }
 
     # 7. رفع الملف النهائي للتنزيل
