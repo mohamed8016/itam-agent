@@ -4,7 +4,7 @@
     Id="*"
     Name="IT Asset Inventory Agent"
     Language="1033"
-    Version="1.0.2"
+    Version="1.0.3"
     Manufacturer="ITAM"
     UpgradeCode="{5B832979-3F9E-48BC-B1D0-2257AFCB8842}">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x86" />
@@ -35,7 +35,7 @@
     </DirectoryRef>
 
     <DirectoryRef Id="ProgramMenuDir">
-      <Component Id="AgentShortcutComponent" Guid="{3A8C2D51-74F6-4D23-9B10-6E5A1C8F42D7}">
+      <Component Id="AgentShortcutComponent" Guid="{7E6D32DA-7266-4625-8052-9EC3EEB6E82C}">
         <Shortcut
           Id="AgentShortcut"
           Name="ITAM Agent"
@@ -43,7 +43,7 @@
           WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall" />
         <RegistryValue
-          Root="HKCU"
+          Root="HKLM"
           Key="Software\ITAM Agent"
           Name="ShortcutInstalled"
           Type="integer"
