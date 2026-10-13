@@ -248,6 +248,7 @@ def _run_powershell_json(script):
         check=True,
         text=True,
         timeout=30,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
     return json.loads(result.stdout)
 
